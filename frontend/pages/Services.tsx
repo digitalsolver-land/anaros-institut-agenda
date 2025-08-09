@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Briefcase, Clock, DollarSign } from 'lucide-react';
+import { Briefcase, Clock, DollarSign, Plus, Edit } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { CreateServiceDialog } from '../components/CreateServiceDialog';
+import { EditServiceDialog } from '../components/EditServiceDialog';
 import backend from '~backend/client';
 import type { Service } from '~backend/services/list';
 
 export function Services() {
   const [services, setServices] = useState<Service[]>([]);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
 
   useEffect(() => {
     loadServices();
@@ -19,6 +25,11 @@ export function Services() {
     } catch (error) {
       console.error('Error loading services:', error);
     }
+  };
+
+  const handleEditService = (serviceId: number) => {
+    setSelectedServiceId(serviceId);
+    setIsEditDialogOpen(true);
   };
 
   const getCategoryColor = (category: string) => {
@@ -78,11 +89,17 @@ export function Services() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Services</h1>
-        <p className="text-gray-600 mt-2">
-          Catalogue des prestations d'Anaros Institut
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Services</h1>
+          <p className="text-gray-600 mt-2">
+            Catalogue des prestations d'Anaros Institut
+          </p>
+        </div>
+        <Button onClick={() => setIsCreateDialogOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Nouveau service
+        </Button>
       </div>
 
       <div className="space-y-8">
@@ -102,7 +119,16 @@ export function Services() {
               {categoryServices.map((service) => (
                 <Card key={service.id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
-                    <CardTitle className="text-lg">{service.name}</CardTitle>
+                    <CardTitle className="flex items-center justify-between">
+                      <span className="text-lg">{service.name}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditService(service.id)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -133,6 +159,19 @@ export function Services() {
           </div>
         ))}
       </div>
+
+      <CreateServiceDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onSuccess={loadServices}
+      />
+
+      <EditServiceDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        onSuccess={loadServices}
+        serviceId={selectedServiceId}
+      />
     </div>
   );
 }

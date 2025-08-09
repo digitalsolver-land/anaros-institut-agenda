@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
-import { UserCheck, Phone, Mail, Star } from 'lucide-react';
+import { UserCheck, Phone, Mail, Plus, Edit } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { CreateEmployeeDialog } from '../components/CreateEmployeeDialog';
+import { EditEmployeeDialog } from '../components/EditEmployeeDialog';
 import backend from '~backend/client';
 import type { Employee } from '~backend/employees/list';
 
 export function Employees() {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
 
   useEffect(() => {
     loadEmployees();
@@ -19,6 +25,11 @@ export function Employees() {
     } catch (error) {
       console.error('Error loading employees:', error);
     }
+  };
+
+  const handleEditEmployee = (employeeId: number) => {
+    setSelectedEmployeeId(employeeId);
+    setIsEditDialogOpen(true);
   };
 
   const getSpecialtyColor = (specialty: string) => {
@@ -53,20 +64,35 @@ export function Employees() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Employés</h1>
-        <p className="text-gray-600 mt-2">
-          Équipe d'Anaros Institut
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Employés</h1>
+          <p className="text-gray-600 mt-2">
+            Équipe d'Anaros Institut
+          </p>
+        </div>
+        <Button onClick={() => setIsCreateDialogOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Nouvel employé
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {employees.map((employee) => (
           <Card key={employee.id} className="hover:shadow-md transition-shadow">
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <UserCheck className="w-5 h-5 text-pink-600" />
-                <span>{employee.name}</span>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <UserCheck className="w-5 h-5 text-pink-600" />
+                  <span>{employee.name}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleEditEmployee(employee.id)}
+                >
+                  <Edit className="w-4 h-4" />
+                </Button>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -110,6 +136,19 @@ export function Employees() {
           </Card>
         ))}
       </div>
+
+      <CreateEmployeeDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onSuccess={loadEmployees}
+      />
+
+      <EditEmployeeDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        onSuccess={loadEmployees}
+        employeeId={selectedEmployeeId}
+      />
     </div>
   );
 }
