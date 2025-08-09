@@ -34,56 +34,83 @@ export interface ListByEmployeeResponse {
 export const listByEmployee = api<ListByEmployeeParams, ListByEmployeeResponse>(
   { expose: true, method: "GET", path: "/appointments/employee/:employee_id" },
   async (params) => {
-    const targetDate = params.date || new Date().toISOString().split('T')[0];
-    
-    // First get appointments
-    const appointments = await appointmentsDB.queryAll<{
-      id: number;
-      client_id: number;
-      service_name: string;
-      appointment_date: string;
-      start_time: string;
-      end_time: string;
-      status: string;
-      client_present?: boolean;
-      special_instructions?: string;
-    }>`
-      SELECT 
-        id, client_id, service_name, appointment_date, start_time, end_time,
-        status, client_present, special_instructions
-      FROM appointments
-      WHERE employee_id = ${params.employee_id}
-        AND appointment_date = ${targetDate}
-        AND status NOT IN ('cancelled')
-      ORDER BY start_time
-    `;
-
-    // Then get client details for each appointment
-    const appointmentsWithClients: AppointmentWithClient[] = [];
-    
-    for (const appointment of appointments) {
-      const client = await clientsDB.queryRow<{
-        name: string;
-        phone: string;
-        allergies?: string;
-        preferences?: string;
+    try {
+      const targetDate = params.date || new Date().toISOString().split('T')[0];
+      
+      // First get appointments
+      const appointments = await appointmentsDB.queryAll<{
+        id: number;
+        client_id: number;
+        service_name: string;
+        appointment_date: string;
+        start_time: string;
+        end_time: string;
+        status: string;
+        client_present?: boolean;
+        special_instructions?: string;
       }>`
-        SELECT name, phone, allergies, preferences
-        FROM clients
-        WHERE id = ${appointment.client_id}
+        SELECT 
+          id, client_id, service_name, appointment_date, start_time, end_time,
+          status, client_present, special_instructions
+        FROM appointments
+        WHERE employee_id = ${params.employee_id}
+          AND appointment_date = ${targetDate}
+          AND status NOT IN ('cancelled')
+        ORDER BY start_time
       `;
 
-      if (client) {
-        appointmentsWithClients.push({
-          ...appointment,
-          client_name: client.name,
-          client_phone: client.phone,
-          allergies: client.allergies,
-          preferences: client.preferences,
-        });
-      }
-    }
+      // Then get client details for each appointment
+      const appointmentsWithClients: AppointmentWithClient[] = [];
+      
+      for (const appointment of appointments) {
+        try {
+          const client = await clientsDB.queryRow<{
+            name: string;
+            phone: string;
+            allergies?: string;
+            preferences?: string;
+          }>`
+            SELECT name, phone, allergies, preferences
+            FROM clients
+            WHERE id = ${appointment.client_id}
+          `;
 
-    return { appointments: appointmentsWithClients };
+          if (client) {
+            appointmentsWithClients.push({
+              ...appointment,
+              client_name: client.name,
+              client_phone: client.phone,
+              allergies: client.allergies,
+              preferences: client.preferences,
+            });
+          } else {
+            // If client not found, still include appointment with placeholder data
+            appointmentsWithClients.push({
+              ...appointment,
+              client_name: `Client #${appointment.client_id}`,
+              client_phone: 'N/A',
+              allergies: undefined,
+              preferences: undefined,
+            });
+          }
+        } catch (clientError) {
+          console.error(`Error fetching client ${appointment.client_id}:`, clientError);
+          // Include appointment with placeholder data if client fetch fails
+          appointmentsWithClients.push({
+            ...appointment,
+            client_name: `Client #${appointment.client_id}`,
+            client_phone: 'N/A',
+            allergies: undefined,
+            preferences: undefined,
+          });
+        }
+      }
+
+      return { appointments: appointmentsWithClients };
+    } catch (error) {
+      console.error("Error in listByEmployee:", error);
+      // Return empty array instead of throwing error
+      return { appointments: [] };
+    }
   }
 );

@@ -49,6 +49,18 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
     if (open) {
       loadServices();
       loadEmployees();
+      // Reset form when dialog opens
+      setFormData({
+        client_id: '',
+        employee_id: '',
+        service_id: '',
+        appointment_date: new Date().toISOString().split('T')[0],
+        start_time: '09:00',
+        special_instructions: '',
+      });
+      setClientSearch('');
+      setClients([]);
+      setSelectedService(null);
     }
   }, [open]);
 
@@ -57,6 +69,7 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
       searchClients();
     } else {
       setClients([]);
+      setFormData(prev => ({ ...prev, client_id: '' }));
     }
   }, [clientSearch]);
 
@@ -68,6 +81,9 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
       if (service) {
         loadEmployeesBySpecialty(service.category);
       }
+    } else {
+      setSelectedService(null);
+      setFormData(prev => ({ ...prev, employee_id: '' }));
     }
   }, [formData.service_id, services]);
 
@@ -103,6 +119,8 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
     try {
       const response = await backend.employees.getBySpecialty({ specialty });
       setEmployees(response.employees);
+      // Reset employee selection when specialty changes
+      setFormData(prev => ({ ...prev, employee_id: '' }));
     } catch (error) {
       console.error('Error loading employees by specialty:', error);
       toast({
@@ -137,46 +155,97 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
     return `${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}`;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedService) {
-      toast({
-        title: 'Erreur',
-        description: 'Veuillez sélectionner un service.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
+  const validateForm = () => {
     if (!formData.client_id) {
       toast({
-        title: 'Erreur',
+        title: 'Erreur de validation',
         description: 'Veuillez sélectionner un client.',
         variant: 'destructive',
       });
-      return;
+      return false;
+    }
+
+    if (!formData.service_id || !selectedService) {
+      toast({
+        title: 'Erreur de validation',
+        description: 'Veuillez sélectionner un service.',
+        variant: 'destructive',
+      });
+      return false;
     }
 
     if (!formData.employee_id) {
       toast({
-        title: 'Erreur',
+        title: 'Erreur de validation',
         description: 'Veuillez sélectionner un employé.',
         variant: 'destructive',
       });
+      return false;
+    }
+
+    if (!formData.appointment_date) {
+      toast({
+        title: 'Erreur de validation',
+        description: 'Veuillez sélectionner une date.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    if (!formData.start_time) {
+      toast({
+        title: 'Erreur de validation',
+        description: 'Veuillez sélectionner une heure de début.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    // Check if the date is not in the past
+    const selectedDate = new Date(formData.appointment_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+      toast({
+        title: 'Erreur de validation',
+        description: 'Impossible de créer un rendez-vous dans le passé.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const endTime = calculateEndTime(formData.start_time, selectedService.duration_minutes);
+      const endTime = calculateEndTime(formData.start_time, selectedService!.duration_minutes);
       
+      console.log('Creating appointment with data:', {
+        client_id: parseInt(formData.client_id),
+        employee_id: parseInt(formData.employee_id),
+        service_id: parseInt(formData.service_id),
+        service_name: selectedService!.name,
+        appointment_date: formData.appointment_date,
+        start_time: formData.start_time,
+        end_time: endTime,
+        special_instructions: formData.special_instructions || undefined,
+      });
+
       await backend.appointments.create({
         client_id: parseInt(formData.client_id),
         employee_id: parseInt(formData.employee_id),
         service_id: parseInt(formData.service_id),
-        service_name: selectedService.name,
+        service_name: selectedService!.name,
         appointment_date: formData.appointment_date,
         start_time: formData.start_time,
         end_time: endTime,
@@ -184,10 +253,11 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
       });
 
       toast({
-        title: 'Rendez-vous créé',
-        description: 'Le nouveau rendez-vous a été programmé avec succès.',
+        title: 'Succès',
+        description: 'Le rendez-vous a été créé avec succès.',
       });
 
+      // Reset form
       setFormData({
         client_id: '',
         employee_id: '',
@@ -206,10 +276,16 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
       
       let errorMessage = 'Impossible de créer le rendez-vous. Veuillez réessayer.';
       
-      if (error?.message?.includes('Time slot is already booked')) {
-        errorMessage = 'Ce créneau horaire est déjà réservé pour cet employé.';
-      } else if (error?.message?.includes('not found')) {
-        errorMessage = 'Données manquantes. Vérifiez que le client, l\'employé et le service existent.';
+      if (error?.message) {
+        if (error.message.includes('déjà réservé') || error.message.includes('already booked')) {
+          errorMessage = 'Ce créneau horaire est déjà réservé pour cet employé.';
+        } else if (error.message.includes('Missing required fields')) {
+          errorMessage = 'Données manquantes. Veuillez vérifier tous les champs obligatoires.';
+        } else if (error.message.includes('not found')) {
+          errorMessage = 'Données introuvables. Vérifiez que le client, l\'employé et le service existent.';
+        } else {
+          errorMessage = error.message;
+        }
       }
       
       toast({
@@ -221,6 +297,8 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
       setIsLoading(false);
     }
   };
+
+  const isFormValid = formData.client_id && formData.service_id && formData.employee_id && formData.appointment_date && formData.start_time;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -236,7 +314,7 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
               id="client-search"
               value={clientSearch}
               onChange={(e) => setClientSearch(e.target.value)}
-              placeholder="Nom ou téléphone du client..."
+              placeholder="Tapez le nom ou téléphone du client..."
             />
             {clients.length > 0 && (
               <Select value={formData.client_id} onValueChange={(value) => setFormData({ ...formData, client_id: value })}>
@@ -251,6 +329,9 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
                   ))}
                 </SelectContent>
               </Select>
+            )}
+            {clientSearch.length >= 2 && clients.length === 0 && (
+              <p className="text-sm text-gray-500 mt-1">Aucun client trouvé</p>
             )}
           </div>
 
@@ -272,9 +353,13 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
 
           <div>
             <Label htmlFor="employee">Employé *</Label>
-            <Select value={formData.employee_id} onValueChange={(value) => setFormData({ ...formData, employee_id: value })}>
+            <Select 
+              value={formData.employee_id} 
+              onValueChange={(value) => setFormData({ ...formData, employee_id: value })}
+              disabled={!selectedService}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Sélectionner un employé" />
+                <SelectValue placeholder={selectedService ? "Sélectionner un employé" : "Sélectionnez d'abord un service"} />
               </SelectTrigger>
               <SelectContent>
                 {employees.map((employee) => (
@@ -294,6 +379,7 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
                 type="date"
                 value={formData.appointment_date}
                 onChange={(e) => setFormData({ ...formData, appointment_date: e.target.value })}
+                min={new Date().toISOString().split('T')[0]}
                 required
               />
             </div>
@@ -312,10 +398,16 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
           {selectedService && (
             <div className="p-3 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600">
+                <strong>Service:</strong> {selectedService.name}
+              </p>
+              <p className="text-sm text-gray-600">
                 <strong>Durée:</strong> {Math.floor(selectedService.duration_minutes / 60)}h{selectedService.duration_minutes % 60 > 0 ? `${selectedService.duration_minutes % 60}min` : ''}
               </p>
               <p className="text-sm text-gray-600">
                 <strong>Fin prévue:</strong> {calculateEndTime(formData.start_time, selectedService.duration_minutes)}
+              </p>
+              <p className="text-sm text-gray-600">
+                <strong>Prix:</strong> {selectedService.price_dzd.toLocaleString()} DZD
               </p>
             </div>
           )}
@@ -335,11 +427,15 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              disabled={isLoading}
             >
               Annuler
             </Button>
-            <Button type="submit" disabled={isLoading || !formData.client_id || !formData.service_id || !formData.employee_id}>
-              {isLoading ? 'Création...' : 'Créer le RDV'}
+            <Button 
+              type="submit" 
+              disabled={isLoading || !isFormValid}
+            >
+              {isLoading ? 'Création en cours...' : 'Créer le rendez-vous'}
             </Button>
           </div>
         </form>
