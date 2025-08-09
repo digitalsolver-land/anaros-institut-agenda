@@ -77,6 +77,11 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
       setServices(response.services);
     } catch (error) {
       console.error('Error loading services:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de charger les services.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -86,6 +91,11 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
       setEmployees(response.employees);
     } catch (error) {
       console.error('Error loading employees:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de charger les employés.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -95,6 +105,11 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
       setEmployees(response.employees);
     } catch (error) {
       console.error('Error loading employees by specialty:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de charger les employés spécialisés.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -104,6 +119,11 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
       setClients(response.clients);
     } catch (error) {
       console.error('Error searching clients:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de rechercher les clients.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -124,6 +144,24 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
       toast({
         title: 'Erreur',
         description: 'Veuillez sélectionner un service.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!formData.client_id) {
+      toast({
+        title: 'Erreur',
+        description: 'Veuillez sélectionner un client.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!formData.employee_id) {
+      toast({
+        title: 'Erreur',
+        description: 'Veuillez sélectionner un employé.',
         variant: 'destructive',
       });
       return;
@@ -163,11 +201,20 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
       setSelectedService(null);
       onOpenChange(false);
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating appointment:', error);
+      
+      let errorMessage = 'Impossible de créer le rendez-vous. Veuillez réessayer.';
+      
+      if (error?.message?.includes('Time slot is already booked')) {
+        errorMessage = 'Ce créneau horaire est déjà réservé pour cet employé.';
+      } else if (error?.message?.includes('not found')) {
+        errorMessage = 'Données manquantes. Vérifiez que le client, l\'employé et le service existent.';
+      }
+      
       toast({
         title: 'Erreur',
-        description: 'Impossible de créer le rendez-vous. Veuillez réessayer.',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

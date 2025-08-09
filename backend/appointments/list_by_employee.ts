@@ -1,5 +1,9 @@
 import { api, Query } from "encore.dev/api";
 import { appointmentsDB } from "./db";
+import { SQLDatabase } from "encore.dev/storage/sqldb";
+
+// Reference the clients database
+const clientsDB = SQLDatabase.named("clients");
 
 export interface ListByEmployeeParams {
   employee_id: number;
@@ -32,20 +36,54 @@ export const listByEmployee = api<ListByEmployeeParams, ListByEmployeeResponse>(
   async (params) => {
     const targetDate = params.date || new Date().toISOString().split('T')[0];
     
-    const appointments = await appointmentsDB.queryAll<AppointmentWithClient>`
+    // First get appointments
+    const appointments = await appointmentsDB.queryAll<{
+      id: number;
+      client_id: number;
+      service_name: string;
+      appointment_date: string;
+      start_time: string;
+      end_time: string;
+      status: string;
+      client_present?: boolean;
+      special_instructions?: string;
+    }>`
       SELECT 
-        a.id, a.client_id, c.name as client_name, c.phone as client_phone,
-        a.service_name, a.appointment_date, a.start_time, a.end_time,
-        a.status, a.client_present, a.special_instructions,
-        c.allergies, c.preferences
-      FROM appointments a
-      JOIN clients c ON a.client_id = c.id
-      WHERE a.employee_id = ${params.employee_id}
-        AND a.appointment_date = ${targetDate}
-        AND a.status NOT IN ('cancelled')
-      ORDER BY a.start_time
+        id, client_id, service_name, appointment_date, start_time, end_time,
+        status, client_present, special_instructions
+      FROM appointments
+      WHERE employee_id = ${params.employee_id}
+        AND appointment_date = ${targetDate}
+        AND status NOT IN ('cancelled')
+      ORDER BY start_time
     `;
 
-    return { appointments };
+    // Then get client details for each appointment
+    const appointmentsWithClients: AppointmentWithClient[] = [];
+    
+    for (const appointment of appointments) {
+      const client = await clientsDB.queryRow<{
+        name: string;
+        phone: string;
+        allergies?: string;
+        preferences?: string;
+      }>`
+        SELECT name, phone, allergies, preferences
+        FROM clients
+        WHERE id = ${appointment.client_id}
+      `;
+
+      if (client) {
+        appointmentsWithClients.push({
+          ...appointment,
+          client_name: client.name,
+          client_phone: client.phone,
+          allergies: client.allergies,
+          preferences: client.preferences,
+        });
+      }
+    }
+
+    return { appointments: appointmentsWithClients };
   }
 );
