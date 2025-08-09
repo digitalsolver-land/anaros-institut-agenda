@@ -18,11 +18,28 @@ export function Navigation() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-8">
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-pink-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">A</span>
+            <Link to="/" className="flex items-center space-x-3">
+              <div className="flex flex-col items-center">
+                <div className="flex items-center justify-center mb-1">
+                  <svg width="32" height="24" viewBox="0 0 40 30" className="text-pink-600">
+                    <g fill="currentColor">
+                      {/* Lotus petals */}
+                      <path d="M20 5 C15 8, 10 12, 12 18 C14 12, 17 8, 20 5 Z" />
+                      <path d="M20 5 C25 8, 30 12, 28 18 C26 12, 23 8, 20 5 Z" />
+                      <path d="M20 8 C16 10, 12 14, 14 20 C16 14, 18 10, 20 8 Z" />
+                      <path d="M20 8 C24 10, 28 14, 26 20 C24 14, 22 10, 20 8 Z" />
+                      <path d="M20 11 C17 12, 14 16, 16 22 C18 16, 19 12, 20 11 Z" />
+                      <path d="M20 11 C23 12, 26 16, 24 22 C22 16, 21 12, 20 11 Z" />
+                      <path d="M20 14 C18 15, 16 18, 18 24 C19 18, 19.5 15, 20 14 Z" />
+                      <path d="M20 14 C22 15, 24 18, 22 24 C21 18, 20.5 15, 20 14 Z" />
+                    </g>
+                  </svg>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-gray-900 tracking-wider">ANAROS</div>
+                  <div className="text-xs text-gray-600 italic -mt-1">Beauty Lounge</div>
+                </div>
               </div>
-              <span className="font-semibold text-gray-900">Anaros Institut</span>
             </Link>
             
             <div className="hidden md:flex space-x-6">
