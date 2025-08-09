@@ -33,15 +33,15 @@ export const create = api<CreateAppointmentRequest, Appointment>(
     try {
       // Validate required fields
       if (!req.client_id || !req.employee_id || !req.service_id) {
-        throw APIError.invalidArgument("Missing required fields: client_id, employee_id, or service_id");
+        throw APIError.invalidArgument("Champs requis manquants: client_id, employee_id, ou service_id");
       }
 
       if (!req.appointment_date || !req.start_time || !req.end_time) {
-        throw APIError.invalidArgument("Missing required fields: appointment_date, start_time, or end_time");
+        throw APIError.invalidArgument("Champs requis manquants: appointment_date, start_time, ou end_time");
       }
 
       if (!req.service_name || req.service_name.trim() === '') {
-        throw APIError.invalidArgument("Service name is required");
+        throw APIError.invalidArgument("Le nom du service est requis");
       }
 
       // Check for time conflicts
@@ -87,6 +87,17 @@ export const create = api<CreateAppointmentRequest, Appointment>(
       
       // Log the actual error for debugging
       console.error("Error creating appointment:", error);
+      
+      // Check for specific database errors
+      if (error && typeof error === 'object' && 'message' in error) {
+        const errorMessage = (error as any).message;
+        if (errorMessage.includes('violates foreign key constraint')) {
+          throw APIError.invalidArgument("Référence invalide: vérifiez que le client, l'employé et le service existent");
+        }
+        if (errorMessage.includes('duplicate key')) {
+          throw APIError.alreadyExists("Un rendez-vous similaire existe déjà");
+        }
+      }
       
       // Throw a generic error for unexpected issues
       throw APIError.internal("Erreur interne lors de la création du rendez-vous");

@@ -276,12 +276,30 @@ export function CreateAppointmentDialog({ open, onOpenChange, onSuccess }: Creat
       
       let errorMessage = 'Impossible de créer le rendez-vous. Veuillez réessayer.';
       
-      if (error?.message) {
+      // Handle different types of errors
+      if (error?.code) {
+        switch (error.code) {
+          case 'already_exists':
+            errorMessage = 'Ce créneau horaire est déjà réservé pour cet employé.';
+            break;
+          case 'invalid_argument':
+            errorMessage = error.message || 'Données invalides. Veuillez vérifier tous les champs.';
+            break;
+          case 'not_found':
+            errorMessage = 'Données introuvables. Vérifiez que le client, l\'employé et le service existent.';
+            break;
+          case 'internal':
+            errorMessage = 'Erreur interne du serveur. Veuillez réessayer plus tard.';
+            break;
+          default:
+            errorMessage = error.message || errorMessage;
+        }
+      } else if (error?.message) {
         if (error.message.includes('déjà réservé') || error.message.includes('already booked')) {
           errorMessage = 'Ce créneau horaire est déjà réservé pour cet employé.';
-        } else if (error.message.includes('Missing required fields')) {
+        } else if (error.message.includes('Missing required fields') || error.message.includes('requis')) {
           errorMessage = 'Données manquantes. Veuillez vérifier tous les champs obligatoires.';
-        } else if (error.message.includes('not found')) {
+        } else if (error.message.includes('not found') || error.message.includes('introuvable')) {
           errorMessage = 'Données introuvables. Vérifiez que le client, l\'employé et le service existent.';
         } else {
           errorMessage = error.message;
